@@ -104,6 +104,8 @@ export interface EstadoJuego {
   indiceActivo: number // posición dentro de participantes
   ofertaInversiones: Inversion[]
   ofertaCompras: Compra[]
+  mazoInversiones: Inversion[] // resto del mazo de Inversiones, ya barajado una sola vez al iniciar
+  mazoCompras: Compra[] // resto del mazo de Compras, ya barajado una sola vez al iniciar (con instancias duplicadas para las cartas con 2 copias)
   imprevistoActual: Imprevisto | null
   saltarProximoImprevisto: boolean
   imprevistosRevelados: number
@@ -200,22 +202,33 @@ function decidirAccionBot(estado: EstadoJuego, jugador: Jugador): Accion | null 
   }
 }
 
-// Cartas ya poseídas por cualquier jugador (para no repetirlas en la oferta).
-function idsPoseidos(jugadores: Jugador[], clave: "inversiones" | "compras"): Set<string> {
-  const s = new Set<string>()
-  for (const j of jugadores) for (const c of j[clave]) s.add(c.id)
-  return s
+// ----- Mazos de Inversiones y Compras -----
+// Igual que el mazo de Imprevistos, se arman UNA SOLA VEZ al iniciar la partida
+// (barajados) y funcionan como una cola: se revela desde el frente, y las cartas que
+// no se compran en el año vuelven al FINAL del mazo (no se descartan para siempre).
+// Solo las cartas de Compras con 2 copias físicas (ver Excel) pueden volver a aparecer
+// una vez ya compradas — cada copia es una instancia independiente con su propio id.
+
+function construirMazoInversiones(): Inversion[] {
+  // Ninguna carta de Inversión tiene más de 1 copia física.
+  return barajar(INVERSIONES)
 }
 
-function generarOfertaInversiones(jugadores: Jugador[], n: number): Inversion[] {
-  const poseidos = idsPoseidos(jugadores, "inversiones")
-  return barajar(INVERSIONES.filter((c) => !poseidos.has(c.id))).slice(0, Math.max(0, n))
+function construirMazoCompras(): Compra[] {
+  const instancias: Compra[] = []
+  for (const c of COMPRAS) {
+    for (let copia = 1; copia <= c.copias; copia++) {
+      instancias.push(c.copias > 1 ? { ...c, id: `${c.id}-${copia}` } : c)
+    }
+  }
+  return barajar(instancias)
 }
 
-function generarOfertaCompras(jugadores: Jugador[], n: number, retiradas: string[] = []): Compra[] {
-  const poseidos = idsPoseidos(jugadores, "compras")
-  const retiradasSet = new Set(retiradas)
-  return barajar(COMPRAS.filter((c) => !poseidos.has(c.id) && !retiradasSet.has(c.id))).slice(0, Math.max(0, n))
+// Revela las primeras `cantidad` cartas del mazo (o menos, si el mazo tiene menos).
+// No se vuelve a barajar: el mazo ya estaba barajado una sola vez al iniciar la partida.
+function revelarDelMazo<T>(mazo: T[], cantidad: number): { revelado: T[]; resto: T[] } {
+  const n = Math.max(0, Math.min(cantidad, mazo.length))
+  return { revelado: mazo.slice(0, n), resto: mazo.slice(n) }
 }
 
 function log(estado: EstadoJuego, mensaje: string): string[] {
@@ -321,6 +334,8 @@ function estadoInicialVacio(): EstadoJuego {
     indiceActivo: 0,
     ofertaInversiones: [],
     ofertaCompras: [],
+    mazoInversiones: [],
+    mazoCompras: [],
     imprevistoActual: null,
     saltarProximoImprevisto: false,
     imprevistosRevelados: 0,
@@ -354,18 +369,22 @@ function iniciarPartida(
     Number.isInteger(primerJugadorIndex) && primerJugadorIndex >= 0 && primerJugadorIndex < jugadores.length
       ? primerJugadorIndex
       : 0
-  // Se baraja el mazo de 16 imprevistos, se retiran las 6 superiores sin mirarlas
-  // (fe de erratas) y las 10 restantes se usan en orden, una por año.
+  // Se barajan los tres mazos (Imprevistos, Inversiones, Compras) una sola vez al
+  // iniciar la partida.
   const barajado = barajar(IMPREVISTOS)
   const mazoImprevistos = barajado.slice(6)
+  const { revelado: ofertaInversiones, resto: mazoInversiones } = revelarDelMazo(construirMazoInversiones(), 2)
+  const { revelado: ofertaCompras, resto: mazoCompras } = revelarDelMazo(construirMazoCompras(), 2)
   const estado: EstadoJuego = {
     ...base,
     fase: "juego",
     jugadores,
     primerJugador,
     ordenTurno: calcularOrden(primerJugador, jugadores.length),
-    ofertaInversiones: generarOfertaInversiones(jugadores, 2),
-    ofertaCompras: generarOfertaCompras(jugadores, 2),
+    ofertaInversiones,
+    mazoInversiones,
+    ofertaCompras,
+    mazoCompras,
     mazoImprevistos,
     nivelCampeon,
     registro: [`Comienza la partida con ${jugadores.length} jugadores. Nivel de campeón: ${nivelCampeon}.`],
@@ -408,14 +427,21 @@ function entrarZona(estado: EstadoJuego, zona: number): EstadoJuego {
     case 6: {
       const enZona = participantesDeZona(e, 6)
       // Confirmado: cartas en oferta = jugadores posicionados en esta zona + 1
-      // (con piso de 2, que es la oferta base ya revelada al iniciar la partida/año).
+      // (con piso de 2, que es la oferta base ya revelada en la Zona 11 del año
+      // anterior / al iniciar la partida). Si hace falta más de 2, se revelan
+      // cartas adicionales del mazo recién ahora — no se vuelve a barajar nada.
       const cantidad = Math.max(2, enZona.length + 1)
+      const faltan = cantidad - e.ofertaInversiones.length
+      if (faltan > 0) {
+        const { revelado, resto } = revelarDelMazo(e.mazoInversiones, faltan)
+        e.ofertaInversiones = [...e.ofertaInversiones, ...revelado]
+        e.mazoInversiones = resto
+      }
       e.participantes = enZona
-      e.ofertaInversiones = generarOfertaInversiones(e.jugadores, cantidad)
       e.resumenZona = [
         enZona.length === 0
           ? "Ningún jugador se colocó en Inversiones."
-          : `${enZona.length} jugador(es) en Inversiones · ${cantidad} tarjetas en oferta.`,
+          : `${enZona.length} jugador(es) en Inversiones · ${e.ofertaInversiones.length} tarjetas en oferta.`,
       ]
       return e
     }
@@ -423,12 +449,17 @@ function entrarZona(estado: EstadoJuego, zona: number): EstadoJuego {
       const enZona = participantesDeZona(e, 7)
       // Misma fórmula que Inversiones: jugadores en la zona + 1 (piso de 2).
       const cantidad = Math.max(2, enZona.length + 1)
+      const faltan = cantidad - e.ofertaCompras.length
+      if (faltan > 0) {
+        const { revelado, resto } = revelarDelMazo(e.mazoCompras, faltan)
+        e.ofertaCompras = [...e.ofertaCompras, ...revelado]
+        e.mazoCompras = resto
+      }
       e.participantes = enZona
-      e.ofertaCompras = generarOfertaCompras(e.jugadores, cantidad, e.comprasRetiradas)
       e.resumenZona = [
         enZona.length === 0
           ? "Ningún jugador se colocó en Compras."
-          : `${enZona.length} jugador(es) en Compras · ${cantidad} tarjetas en oferta.`,
+          : `${enZona.length} jugador(es) en Compras · ${e.ofertaCompras.length} tarjetas en oferta.`,
       ]
       return e
     }
@@ -707,7 +738,18 @@ function zonaOrganizacion(estado: EstadoJuego): EstadoJuego {
     return { ...jug, sobreEndeudado: sobre }
   })
   if (resumen.length === 0) resumen.push("Se recuperan las fichas de hogar y se renuevan las ofertas.")
-  return { ...estado, jugadores, resumenZona: resumen }
+  // Las cartas de Inversiones/Compras que quedaron en la oferta sin comprar este año
+  // no se pierden: van al final de su mazo (pueden volver a salir más adelante). Las
+  // que sí se compraron ya salieron de la oferta al momento de comprarlas.
+  return {
+    ...estado,
+    jugadores,
+    resumenZona: resumen,
+    ofertaInversiones: [],
+    mazoInversiones: [...estado.mazoInversiones, ...estado.ofertaInversiones],
+    ofertaCompras: [],
+    mazoCompras: [...estado.mazoCompras, ...estado.ofertaCompras],
+  }
 }
 
 // Cierra el año: fin del juego o preparación del próximo año.
@@ -728,14 +770,21 @@ function finDeAnio(estado: EstadoJuego): EstadoJuego {
     modActivo: j.modPendiente,
     modPendiente: { ...MODIFICADORES_VACIOS },
   }))
+  // La oferta base del nuevo año (2 cartas) se revela desde el mazo — el mismo mazo
+  // que en la Zona 11 ya recibió de vuelta, al final, las cartas que quedaron sin
+  // comprar el año anterior.
+  const { revelado: ofertaInversiones, resto: mazoInversiones } = revelarDelMazo(estado.mazoInversiones, 2)
+  const { revelado: ofertaCompras, resto: mazoCompras } = revelarDelMazo(estado.mazoCompras, 2)
   const e: EstadoJuego = {
     ...estado,
     anio: nuevoAnio,
     jugadores,
     primerJugador,
     ordenTurno: calcularOrden(primerJugador, jugadores.length),
-    ofertaInversiones: generarOfertaInversiones(jugadores, 2),
-    ofertaCompras: generarOfertaCompras(jugadores, 2, estado.comprasRetiradas),
+    ofertaInversiones,
+    mazoInversiones,
+    ofertaCompras,
+    mazoCompras,
     registro: [`Año ${nuevoAnio} · Comienza un nuevo año. Primer jugador: ${jugadores[primerJugador].nombre}.`, ...estado.registro].slice(0, 80),
   }
   return entrarZona(e, 1)

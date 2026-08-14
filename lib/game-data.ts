@@ -21,6 +21,10 @@ export interface Compra {
   gastoAnual: number
   coste: number
   recurrente: boolean
+  // Cuántas copias físicas existen de esta carta en el juego real (según el Excel de
+  // referencia). La mayoría tiene 1; algunas tienen 2. Esto determina cuántas veces
+  // puede salir esta misma carta en el mazo de Compras a lo largo de la partida.
+  copias: number
 }
 
 export interface Hogar {
@@ -106,36 +110,36 @@ export const INVERSIONES: Inversion[] = inversionesRaw.map((c, i) => ({
 }))
 
 const comprasRaw: Omit<Compra, "id">[] = [
-  { nombre: "Escafandra", tipo: "Producto", bienestar: 20, gastoAnual: 10, coste: 30, recurrente: true },
-  { nombre: "Teléfono móvil", tipo: "Producto", bienestar: 50, gastoAnual: 20, coste: 90, recurrente: true },
-  { nombre: "Parrilla", tipo: "Producto", bienestar: 20, gastoAnual: 0, coste: 80, recurrente: true },
-  { nombre: "Fiesta", tipo: "Actividad", bienestar: 20, gastoAnual: 50, coste: 50, recurrente: true },
-  { nombre: "Joyas", tipo: "Producto", bienestar: 20, gastoAnual: 0, coste: 90, recurrente: true },
-  { nombre: "Gimnasio", tipo: "Servicio", bienestar: 50, gastoAnual: 30, coste: 0, recurrente: true },
-  { nombre: "Bicicleta", tipo: "Producto", bienestar: 30, gastoAnual: -30, coste: 250, recurrente: true },
-  { nombre: "Zapatillas", tipo: "Producto", bienestar: 10, gastoAnual: 0, coste: 40, recurrente: true },
-  { nombre: "Sembrar tomates", tipo: "Actividad", bienestar: 20, gastoAnual: -10, coste: 100, recurrente: true },
-  { nombre: "Sofá", tipo: "Producto", bienestar: 50, gastoAnual: 0, coste: 220, recurrente: true },
-  { nombre: "Paneles solares", tipo: "Producto", bienestar: 50, gastoAnual: -40, coste: 400, recurrente: true },
-  { nombre: "Juego de mesa", tipo: "Producto", bienestar: 30, gastoAnual: 0, coste: 30, recurrente: true },
-  { nombre: "Mesa de comedor", tipo: "Producto", bienestar: 70, gastoAnual: 0, coste: 300, recurrente: true },
-  { nombre: "Consola de videojuegos", tipo: "Producto", bienestar: 60, gastoAnual: 20, coste: 300, recurrente: true },
-  { nombre: "Libros", tipo: "Producto", bienestar: 30, gastoAnual: 0, coste: 60, recurrente: true },
-  { nombre: "Computador con Wi-Fi", tipo: "Producto", bienestar: 100, gastoAnual: 10, coste: 350, recurrente: true },
-  { nombre: "Donación a ONG", tipo: "Actividad", bienestar: 300, gastoAnual: 30, coste: 400, recurrente: false },
-  { nombre: "Lavadora", tipo: "Producto", bienestar: 10, gastoAnual: 0, coste: 320, recurrente: true },
-  { nombre: "Internet", tipo: "Servicio", bienestar: 40, gastoAnual: 30, coste: 0, recurrente: true },
-  { nombre: "Remodelar la casa", tipo: "Actividad", bienestar: 160, gastoAnual: 20, coste: 700, recurrente: true },
-  { nombre: "Mejora del jardín", tipo: "Actividad", bienestar: 70, gastoAnual: 10, coste: 230, recurrente: true },
-  { nombre: "Cena de aniversario", tipo: "Actividad", bienestar: 60, gastoAnual: 0, coste: 50, recurrente: true },
-  { nombre: "Pelota", tipo: "Producto", bienestar: 10, gastoAnual: 0, coste: 10, recurrente: true },
-  { nombre: "Clases de baile", tipo: "Servicio", bienestar: 60, gastoAnual: 50, coste: 50, recurrente: true },
-  { nombre: "Cuerda para escalar", tipo: "Servicio", bienestar: 10, gastoAnual: 0, coste: 40, recurrente: true },
-  { nombre: "Reunión con amigos", tipo: "Actividad", bienestar: 30, gastoAnual: 20, coste: 0, recurrente: true },
-  { nombre: "Estufa", tipo: "Producto", bienestar: 40, gastoAnual: 30, coste: 120, recurrente: true },
-  { nombre: "Traje espacial", tipo: "Producto", bienestar: 60, gastoAnual: 20, coste: 120, recurrente: true },
-  { nombre: "Secador de pelo", tipo: "Producto", bienestar: 20, gastoAnual: 10, coste: 30, recurrente: true },
-  { nombre: "Llave hidráulica", tipo: "Producto", bienestar: 10, gastoAnual: 0, coste: 10, recurrente: true },
+  { nombre: "Escafandra", tipo: "Producto", bienestar: 20, gastoAnual: 10, coste: 30, recurrente: true, copias: 1 },
+  { nombre: "Teléfono móvil", tipo: "Producto", bienestar: 50, gastoAnual: 20, coste: 90, recurrente: true, copias: 2 },
+  { nombre: "Parrilla", tipo: "Producto", bienestar: 20, gastoAnual: 0, coste: 80, recurrente: true, copias: 2 },
+  { nombre: "Fiesta", tipo: "Actividad", bienestar: 80, gastoAnual: 50, coste: 50, recurrente: true, copias: 2 },
+  { nombre: "Joyas", tipo: "Producto", bienestar: 20, gastoAnual: 0, coste: 90, recurrente: true, copias: 2 },
+  { nombre: "Gimnasio", tipo: "Servicio", bienestar: 50, gastoAnual: 30, coste: 0, recurrente: true, copias: 2 },
+  { nombre: "Bicicleta", tipo: "Producto", bienestar: 30, gastoAnual: -30, coste: 250, recurrente: true, copias: 2 },
+  { nombre: "Zapatillas", tipo: "Producto", bienestar: 10, gastoAnual: 0, coste: 40, recurrente: true, copias: 1 },
+  { nombre: "Sembrar tomates", tipo: "Actividad", bienestar: 20, gastoAnual: -10, coste: 100, recurrente: true, copias: 2 },
+  { nombre: "Sofá", tipo: "Producto", bienestar: 50, gastoAnual: 0, coste: 220, recurrente: true, copias: 2 },
+  { nombre: "Paneles solares", tipo: "Producto", bienestar: 50, gastoAnual: -40, coste: 400, recurrente: true, copias: 2 },
+  { nombre: "Juego de mesa", tipo: "Producto", bienestar: 20, gastoAnual: 0, coste: 30, recurrente: true, copias: 2 },
+  { nombre: "Mesa de comedor", tipo: "Producto", bienestar: 70, gastoAnual: 0, coste: 300, recurrente: true, copias: 2 },
+  { nombre: "Consola de videojuegos", tipo: "Producto", bienestar: 60, gastoAnual: 10, coste: 300, recurrente: true, copias: 2 },
+  { nombre: "Libros", tipo: "Producto", bienestar: 30, gastoAnual: 0, coste: 60, recurrente: true, copias: 2 },
+  { nombre: "Computador con Wi-Fi", tipo: "Producto", bienestar: 100, gastoAnual: 10, coste: 350, recurrente: true, copias: 2 },
+  { nombre: "Donación a ONG", tipo: "Actividad", bienestar: 300, gastoAnual: 30, coste: 400, recurrente: false, copias: 2 },
+  { nombre: "Lavadora", tipo: "Producto", bienestar: 80, gastoAnual: 0, coste: 320, recurrente: true, copias: 2 },
+  { nombre: "Internet", tipo: "Servicio", bienestar: 40, gastoAnual: 30, coste: 0, recurrente: true, copias: 2 },
+  { nombre: "Remodelar la casa", tipo: "Actividad", bienestar: 160, gastoAnual: 20, coste: 700, recurrente: true, copias: 2 },
+  { nombre: "Mejora del jardín", tipo: "Actividad", bienestar: 70, gastoAnual: 10, coste: 230, recurrente: true, copias: 2 },
+  { nombre: "Cena de aniversario", tipo: "Actividad", bienestar: 60, gastoAnual: 50, coste: 50, recurrente: true, copias: 1 },
+  { nombre: "Pelota", tipo: "Producto", bienestar: 10, gastoAnual: 0, coste: 10, recurrente: true, copias: 1 },
+  { nombre: "Clases de baile", tipo: "Servicio", bienestar: 60, gastoAnual: 50, coste: 50, recurrente: true, copias: 1 },
+  { nombre: "Cuerda para escalar", tipo: "Producto", bienestar: 10, gastoAnual: 0, coste: 40, recurrente: true, copias: 1 },
+  { nombre: "Reunión con amigos", tipo: "Actividad", bienestar: 30, gastoAnual: 20, coste: 0, recurrente: true, copias: 2 },
+  { nombre: "Estufa", tipo: "Producto", bienestar: 60, gastoAnual: 20, coste: 120, recurrente: true, copias: 1 },
+  { nombre: "Traje espacial", tipo: "Producto", bienestar: 60, gastoAnual: 20, coste: 120, recurrente: true, copias: 1 },
+  { nombre: "Secador de pelo", tipo: "Producto", bienestar: 20, gastoAnual: 10, coste: 30, recurrente: true, copias: 1 },
+  { nombre: "Llave hidráulica", tipo: "Producto", bienestar: 10, gastoAnual: 0, coste: 10, recurrente: true, copias: 1 },
 ]
 
 export const COMPRAS: Compra[] = comprasRaw.map((c, i) => ({
